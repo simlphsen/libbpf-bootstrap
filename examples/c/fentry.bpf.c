@@ -122,16 +122,16 @@ int BPF_PROG(trace_mmap_lock_acquire_returned, struct mm_struct *mm, const char 
         bpf_map_update_elem(&lock_held_time, &key, &now, BPF_ANY);
     } 
 
-	if (wait_us > 1000000) {
+	if (wait_us > 100000000) {
         // 获取失败，直接打印
         char comm[16];
         bpf_get_current_comm(&comm, sizeof(comm));
-		u64 kstack[3] = {0};
+		u64 kstack[6] = {0};
 	    int kstack_sz = bpf_get_stack(ctx, kstack, sizeof(kstack), 0);
 
-        bpf_printk("mmap_lock ACQUIRE_FAIL: comm=%s pid=%d mm=%s mode=%s wait_us=%llu succ=%d ks=%pS %pS %pS\n",
+        bpf_printk("mmap_lock ACQUIRE: comm=%s pid=%d mm=%s mode=%s wait_us=%llu succ=%d ks=%pS %pS %pS\n",
                    comm, key.pid, memcg_path,
-                   write ? "WRITE" : "READ", wait_us, success, kstack[0], kstack[1], kstack[2]);
+                   write ? "WRITE" : "READ", wait_us, success, kstack[3], kstack[4], kstack[5]);
     }
 
     return 0;
@@ -154,18 +154,18 @@ int BPF_PROG(trace_mmap_lock_released, struct mm_struct *mm, const char *memcg_p
     u64 hold_us = (now - *held_ts);
     bpf_map_delete_elem(&lock_held_time, &key);
 
-	if (hold_us < 1000000) return 0;
+	if (hold_us < 100000000) return 0;
 
     char comm[16];
     bpf_get_current_comm(&comm, sizeof(comm));
 
-	u64 kstack[3] = {0};
+	u64 kstack[6] = {0};
     int kstack_sz = bpf_get_stack(ctx, kstack, sizeof(kstack), 0);
 
     /* 直接将结果输出至 trace_pipe */
     bpf_printk("mmap_lock RELEASE: comm=%s pid=%d mm=%s mode=%s hold_us=%llu ks=%pS %pS %pS\n",
                comm, key.pid, memcg_path,
-               write ? "WRITE" : "READ", hold_us, kstack[0], kstack[1], kstack[2]);
+               write ? "WRITE" : "READ", hold_us, kstack[3], kstack[4], kstack[5]);
 
     return 0;
 }
