@@ -32,3 +32,10 @@ jobs:
     - name: Build xmake android examples/c
       run: |
         cd examples/c && xmake f -p android -a ${{ matrix.arch }} --require-bpftool=y -y && xmake -y
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v3
+      if: success()
+      with:
+        name: libbpf-bootstrap-${{ matrix.arch }}
+        path: examples/c/build/
+        retention-days: 30
