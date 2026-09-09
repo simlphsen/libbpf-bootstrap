@@ -126,7 +126,7 @@ int BPF_PROG(trace_mmap_lock_acquire_returned, struct mm_struct *mm, const char 
         // 获取失败，直接打印
         char comm[16];
         bpf_get_current_comm(&comm, sizeof(comm));
-		u64 kstack[3] = {0}
+		u64 kstack[3] = {0};
 	    int kstack_sz = bpf_get_stack(ctx, kstack, sizeof(kstack), 0);
 
         bpf_printk("mmap_lock ACQUIRE_FAIL: comm=%s pid=%d mm=%s mode=%s wait_us=%llu succ=%d ks=%pS %pS %pS\n",
@@ -159,7 +159,7 @@ int BPF_PROG(trace_mmap_lock_released, struct mm_struct *mm, const char *memcg_p
     char comm[16];
     bpf_get_current_comm(&comm, sizeof(comm));
 
-	u64 kstack[3] = {0}
+	u64 kstack[3] = {0};
     int kstack_sz = bpf_get_stack(ctx, kstack, sizeof(kstack), 0);
 
     /* 直接将结果输出至 trace_pipe */
