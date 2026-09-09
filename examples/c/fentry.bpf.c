@@ -63,12 +63,6 @@ int BPF_KPROBE(fuse_lookup, struct inode *dir, struct dentry *entry)
 }
 
 
-#include "vmlinux.h"
-#include <bpf/bpf_helpers.h>
-#include <bpf/bpf_tracing.h>
-
-char LICENSE[] SEC("license") = "GPL";
-
 struct lock_key {
     __u32 pid;
     __u64 mm;
