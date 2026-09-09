@@ -21,6 +21,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+        fetch-depth: 1
 
     # 1. 缓存 Xmake 下载和构建的第三方依赖包 (~/.xmake/packages)
     - name: Cache Xmake Packages
