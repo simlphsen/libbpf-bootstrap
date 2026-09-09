@@ -22,7 +22,7 @@ jobs:
       with:
         submodules: recursive
 
-    # 1. 缓存 Xmake 下载和构建的依赖包
+    # 1. 缓存 Xmake 下载和构建的第三方依赖包 (~/.xmake/packages)
     - name: Cache Xmake Packages
       uses: actions/cache@v4
       with:
@@ -33,28 +33,31 @@ jobs:
         restore-keys: |
           xmake-${{ runner.os }}-${{ matrix.arch }}-
 
-    # 2. 缓存 APT 下载的 deb 包，避免重复下载系统依赖
-    - name: Cache APT Packages
-      uses: actions/cache@v4
+    # 2. 配置并管理 ccache 编译缓存
+    - name: Setup Ccache
+      uses: hendrikmuhs/ccache-action@v1.2
       with:
-        path: /var/cache/apt/archives
-        key: apt-${{ runner.os }}-build-essential-clang-llvm
+        key: ccache-${{ runner.os }}-${{ matrix.arch }}
+        # GitHub 默认单项 Cache 限制 10GB，ccache 建议分配 2GB~5GB
+        max-size: 2G
 
     - name: Install System Dependencies
       run: |
         sudo apt-get update -y
         sudo apt-get install -yqq --no-install-recommends \
-          build-essential clang llvm zlib1g-dev libc++-dev libc++abi-dev
+          build-essential clang llvm zlib1g-dev libc++-dev libc++abi-dev ccache
 
     - name: Setup Xmake
       uses: xmake-io/github-action-setup-xmake@v1
       with:
         xmake-version: branch@master
 
+    # 3. 开启 ccache 支持并构建
     - name: Build xmake android examples/c
       run: |
         cd examples/c
-        xmake f -p android -a ${{ matrix.arch }} --require-bpftool=y -y --ndk=$ANDROID_NDK_LATEST_HOME
+        # 通过 --ccache=y 参数开启 ccache 加速
+        xmake f -p android -a ${{ matrix.arch }} --require-bpftool=y --ccache=y -y --ndk=$ANDROID_NDK_LATEST_HOME
         xmake -y
 
     - name: Upload Build Artifacts
