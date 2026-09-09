@@ -63,4 +63,111 @@ int BPF_KPROBE(fuse_lookup, struct inode *dir, struct dentry *entry)
 }
 
 
+#include "vmlinux.h"
+#include <bpf/bpf_helpers.h>
+#include <bpf/bpf_tracing.h>
+
+char LICENSE[] SEC("license") = "GPL";
+
+struct lock_key {
+    __u32 pid;
+    __u64 mm;
+};
+
+/* 1. 记录尝试获取锁的时间戳 */
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 10240);
+    __type(key, struct lock_key);
+    __type(value, __u64);
+} lock_start_time SEC(".maps");
+
+/* 2. 记录成功持有锁的时间戳 */
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 10240);
+    __type(key, struct lock_key);
+    __type(value, __u64);
+} lock_held_time SEC(".maps");
+
+
+/* 开始尝试获取锁 */
+SEC("tp_btf/mmap_lock_start_locking")
+int BPF_PROG(trace_mmap_lock_start_locking, struct mm_struct *mm, const char *memcg_path, bool write)
+{
+    struct lock_key key = {};
+    key.pid = (__u32)bpf_get_current_pid_tgid();
+    key.mm = (__u64)mm;
+
+    __u64 ts = bpf_ktime_get_ns();
+    bpf_map_update_elem(&lock_start_time, &key, &ts, BPF_ANY);
+
+    return 0;
+}
+
+
+/* 获取锁的结果返回 */
+SEC("tp_btf/mmap_lock_acquire_returned")
+int BPF_PROG(trace_mmap_lock_acquire_returned, struct mm_struct *mm, const char *memcg_path, bool write, bool success)
+{
+    struct lock_key key = {};
+    key.pid = (__u32)bpf_get_current_pid_tgid();
+    key.mm = (__u64)mm;
+
+    __u64 *start_ts = bpf_map_lookup_elem(&lock_start_time, &key);
+    u64 now = bpf_ktime_get_ns();
+    u64 wait_us = 0;
+
+    if (start_ts) {
+        wait_us = (now - *start_ts);
+        bpf_map_delete_elem(&lock_start_time, &key);
+    }
+
+    if (success) {
+        // 成功拿到锁，记录持锁起始时间
+        bpf_map_update_elem(&lock_held_time, &key, &now, BPF_ANY);
+    } 
+	
+	if (!success || wait_us > 1000000) {
+        // 获取失败，直接打印
+        char comm[16];
+        bpf_get_current_comm(&comm, sizeof(comm));
+        bpf_printk("mmap_lock ACQUIRE_FAIL: comm=%s pid=%d mm=%s mode=%s wait_us=%llu succ=%d\n",
+                   comm, key.pid, memcg_path,
+                   write ? "WRITE" : "READ", wait_us, success);
+    }
+
+    return 0;
+}
+
+
+/* 锁释放 */
+SEC("tp_btf/mmap_lock_released")
+int BPF_PROG(trace_mmap_lock_released, struct mm_struct *mm, const char *memcg_path, bool write)
+{
+    struct lock_key key = {};
+    key.pid = (__u32)bpf_get_current_pid_tgid();
+    key.mm = (__u64)mm;
+
+    __u64 *held_ts = bpf_map_lookup_elem(&lock_held_time, &key);
+    if (!held_ts)
+        return 0;
+
+    u64 now = bpf_ktime_get_ns();
+    u64 hold_us = (now - *held_ts);
+    bpf_map_delete_elem(&lock_held_time, &key);
+
+	if (hold_us < 1000000) return 0;
+	
+    char comm[16];
+    bpf_get_current_comm(&comm, sizeof(comm));
+
+    /* 直接将结果输出至 trace_pipe */
+    bpf_printk("mmap_lock RELEASE: comm=%s pid=%d mm=%s mode=%s hold_us=%llu\n",
+               comm, key.pid, memcg_path,
+               write ? "WRITE" : "READ", hold_us);
+
+    return 0;
+}
+
 
