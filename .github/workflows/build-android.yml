@@ -17,21 +17,46 @@ jobs:
       matrix:
         arch: [armeabi-v7a, arm64-v8a, x86_64]
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout Repository
+      uses: actions/checkout@v4
       with:
-        submodules: true
-    - uses: xmake-io/github-action-setup-xmake@v1
+        submodules: recursive
+
+    # 1. 缓存 Xmake 下载和构建的依赖包
+    - name: Cache Xmake Packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.xmake/packages
+          ~/.xmake/cache
+        key: xmake-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('**/xmake.lua') }}
+        restore-keys: |
+          xmake-${{ runner.os }}-${{ matrix.arch }}-
+
+    # 2. 缓存 APT 下载的 deb 包，避免重复下载系统依赖
+    - name: Cache APT Packages
+      uses: actions/cache@v4
+      with:
+        path: /var/cache/apt/archives
+        key: apt-${{ runner.os }}-build-essential-clang-llvm
+
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -yqq --no-install-recommends \
+          build-essential clang llvm zlib1g-dev libc++-dev libc++abi-dev
+
+    - name: Setup Xmake
+      uses: xmake-io/github-action-setup-xmake@v1
       with:
         xmake-version: branch@master
-    - name: Install Dependencies
-      run: |
-        sudo apt-get update -y && sudo apt-get install -yqq \
-          build-essential clang llvm zlib1g-dev libc++-dev libc++abi-dev \
-          sudo \
-          && sudo apt-get -y clean
+
     - name: Build xmake android examples/c
       run: |
-        cd examples/c && xmake f -p android -a ${{ matrix.arch }} --require-bpftool=y -y && xmake -y
+        cd examples/c
+        xmake f -p android -a ${{ matrix.arch }} --require-bpftool=y -y --ndk=$ANDROID_NDK_LATEST_HOME
+        xmake -y
+
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       if: success()
