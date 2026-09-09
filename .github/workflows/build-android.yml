@@ -17,21 +17,50 @@ jobs:
       matrix:
         arch: [armeabi-v7a, arm64-v8a, x86_64]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         submodules: true
+
+    # 缓存 APT 依赖包
+    - name: Cache APT packages
+      uses: actions/cache@v3
+      id: apt-cache
+      with:
+        path: /var/cache/apt/archives
+        key: ${{ runner.os }}-apt-deps-${{ hashFiles('**/build-android.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-apt-deps-
+
     - uses: xmake-io/github-action-setup-xmake@v1
       with:
         xmake-version: branch@master
+
+    # 缓存 xmake 的包管理器和构建输出
+    - name: Cache xmake packages and build
+      uses: actions/cache@v3
+      id: xmake-cache
+      with:
+        path: |
+          ~/.xmake
+          ~/.local/share/xmake
+          /tmp/xmake-packages
+          examples/c/build
+          examples/c/.xmake
+        key: ${{ runner.os }}-xmake-android-${{ matrix.arch }}-${{ hashFiles('examples/c/xmake.lua', 'xmake.lua') }}
+        restore-keys: |
+          ${{ runner.os }}-xmake-android-${{ matrix.arch }}-
+
     - name: Install Dependencies
       run: |
         sudo apt-get update -y && sudo apt-get install -yqq \
           build-essential clang llvm zlib1g-dev libc++-dev libc++abi-dev \
           sudo \
           && sudo apt-get -y clean
+
     - name: Build xmake android examples/c
       run: |
         cd examples/c && xmake f -p android -a ${{ matrix.arch }} --require-bpftool=y -y && xmake -y
+
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       if: success()
