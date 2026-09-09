@@ -32,7 +32,7 @@ int BPF_PROG(do_unlinkat_exit, int dfd, struct filename *name, long ret)
 SEC("kprobe/fuse_create_open")
 int BPF_KPROBE(fuse_create_open, struct inode *dir, struct dentry *entry)
 {
-	if (bpf_get_current_uid_gid() != 0) return;
+	if (bpf_get_current_uid_gid() != 0) return 0;
 
 	void* ptr = BPF_CORE_READ(entry, d_u.d_alias.pprev);
 	
@@ -43,7 +43,7 @@ int BPF_KPROBE(fuse_create_open, struct inode *dir, struct dentry *entry)
 SEC("kprobe/fuse_atomic_open")
 int BPF_KPROBE(fuse_atomic_open, struct inode *dir, struct dentry *entry)
 {
-	if (bpf_get_current_uid_gid() != 0) return;
+	if (bpf_get_current_uid_gid() != 0) return 0;
 
 	void* ptr = BPF_CORE_READ(entry, d_u.d_alias.pprev);
 	
