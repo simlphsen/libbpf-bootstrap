@@ -126,12 +126,12 @@ int BPF_PROG(trace_mmap_lock_acquire_returned, struct mm_struct *mm, const char 
         // 获取失败，直接打印
         char comm[16];
         bpf_get_current_comm(&comm, sizeof(comm));
-		u64 kstack[6] = {0};
+		u64 kstack[8] = {0};
 	    int kstack_sz = bpf_get_stack(ctx, kstack, sizeof(kstack), 0);
 
         bpf_printk("mmap_lock ACQUIRE: comm=%s pid=%d mm=%s mode=%s wait_us=%llu succ=%d ks=%pS %pS %pS\n",
                    comm, key.pid, memcg_path,
-                   write ? "WRITE" : "READ", wait_us, success, kstack[3], kstack[4], kstack[5]);
+                   write ? "WRITE" : "READ", wait_us, success, kstack[5], kstack[6], kstack[7]);
     }
 
     return 0;
@@ -159,13 +159,13 @@ int BPF_PROG(trace_mmap_lock_released, struct mm_struct *mm, const char *memcg_p
     char comm[16];
     bpf_get_current_comm(&comm, sizeof(comm));
 
-	u64 kstack[6] = {0};
+	u64 kstack[8] = {0};
     int kstack_sz = bpf_get_stack(ctx, kstack, sizeof(kstack), 0);
 
     /* 直接将结果输出至 trace_pipe */
     bpf_printk("mmap_lock RELEASE: comm=%s pid=%d mm=%s mode=%s hold_us=%llu ks=%pS %pS %pS\n",
                comm, key.pid, memcg_path,
-               write ? "WRITE" : "READ", hold_us, kstack[3], kstack[4], kstack[5]);
+               write ? "WRITE" : "READ", hold_us, kstack[5], kstack[6], kstack[7]);
 
     return 0;
 }
