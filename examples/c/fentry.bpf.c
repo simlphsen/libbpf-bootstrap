@@ -51,4 +51,16 @@ int BPF_KPROBE(fuse_atomic_open, struct inode *dir, struct dentry *entry)
 	return 0;
 }
 
+SEC("kprobe/fuse_lookup")
+int BPF_KPROBE(fuse_lookup, struct inode *dir, struct dentry *entry)
+{
+	if (bpf_get_current_uid_gid() != 0) return 0;
+
+	void* ptr = BPF_CORE_READ(entry, d_u.d_alias.pprev);
+	
+	bpf_printk("xxx fuse_lookup: ptr = %lx, ino = %lu\n", ptr, BPF_CORE_READ(dir, i_ino));
+	return 0;
+}
+
+
 
