@@ -186,7 +186,14 @@ int BPF_KPROBE(zram_read_page, struct zram *z)
 	return 0;
 }
 
-
+SEC("kprobe/disksize_show")
+int BPF_KPROBE(disksize_show)
+{
+	if (!zg) return 0;
+	for (int i = 0; i < 16; i++)
+		bpf_printk("xxx zram_bitmap: ptr = %lx\n", BPF_CORE_READ(zg, bitmap[i]));
+	return 0;
+}
 
 
 
