@@ -91,7 +91,6 @@ int main(int argc, char **argv)
  
 cleanup:
 	ring_buffer__free(rb);
-	ringbuf_output_bpf__destroy(skel);
 	fentry_bpf__destroy(skel);
 	return -err;
 }
