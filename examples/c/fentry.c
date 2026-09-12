@@ -16,7 +16,7 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 	return vfprintf(stderr, format, args);
 }
 
-static volatile sig_atomic_t stop = 0
+static volatile sig_atomic_t stop = 0;
 
 void sig_int(int signo)
 {
@@ -24,13 +24,13 @@ void sig_int(int signo)
 }
 
 struct be {
-	unsign long bitmap[16384];
-}
+	unsigned long bitmap[16384];
+};
 
 int handle_event(void *ctx, void *data, size_t data_sz)
 {
 	const struct be *e = data;
-	for (int = 0 ; i < 16384; i++) {
+	for (int i = 0 ; i < 16384; i++) {
 		if (e->bitmap[i] != 0) {
 			printf("%d %lx\n", i, e->bitmap[i]);
 		}
