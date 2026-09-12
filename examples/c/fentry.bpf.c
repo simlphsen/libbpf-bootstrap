@@ -170,6 +170,15 @@ int BPF_PROG(trace_mmap_lock_released, struct mm_struct *mm, const char *memcg_p
     return 0;
 }
 
+struct {
+ __uint(type, BPF_MAP_TYPE_RINGBUF);
+ __uint(max_entries, 2 * 1024 * 1024);
+} rb SEC(".maps");
+
+struct bitmap_e {
+	unsigned long bitmap[16384];
+};
+
 struct zram {
 	unsigned long *bitmap;
 	unsigned long nr_pages;
@@ -191,6 +200,13 @@ int BPF_KPROBE(disksize_show)
 {
 	if (!zg) return 0;
 	unsigned long *bitmap = BPF_CORE_READ(zg, bitmap);
+
+	struct bitmap_e *e = bpf_ringbuf_reserve(&rb, sizeof(*e), 0);
+	if (e) {
+		bpf_probe_read_kernel(e->bitmap, sizeof(e->bitmap), bitmap);
+		bpf_ringbuf_submit(e, 0);
+	}
+	
 	unsigned long tmp[16];
 	bpf_probe_read_kernel(tmp, sizeof(tmp), bitmap);
 	for (int i = 0; i < 16; i++) {
