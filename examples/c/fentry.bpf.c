@@ -170,4 +170,23 @@ int BPF_PROG(trace_mmap_lock_released, struct mm_struct *mm, const char *memcg_p
     return 0;
 }
 
+struct zram {
+	unsigned long *bitmap;
+	unsigned long nr_pages;
+} __attribute__((preserve_access_index));
+
+struct zram *zg = NULL;
+
+SEC("kprobe/zram_read_page")
+int BPF_KPROBE(zram_read_page, struct zram *z)
+{
+	if (zg) return 0;
+	zg = z;
+	bpf_printk("xxx zram_read_page: ptr = %lx, ino = %lu\n", z, BPF_CORE_READ(z, nr_pages));
+	return 0;
+}
+
+
+
+
 
