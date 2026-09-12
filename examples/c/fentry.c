@@ -16,16 +16,32 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 	return vfprintf(stderr, format, args);
 }
 
-static volatile sig_atomic_t stop;
+static volatile sig_atomic_t stop = 0
 
 void sig_int(int signo)
 {
 	stop = 1;
 }
 
+struct be {
+	unsign long bitmap[16384];
+}
+
+int handle_event(void *ctx, void *data, size_t data_sz)
+{
+	const struct be *e = data;
+	for (int = 0 ; i < 16384; i++) {
+		if (e->bitmap[i] != 0) {
+			printf("%d %lx\n", i, e->bitmap[i]);
+		}
+	}
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	struct fentry_bpf *skel;
+    struct ring_buffer *rb = NULL;
 	int err;
 
 	/* Set up libbpf errors and debug info callback */
@@ -53,14 +69,29 @@ int main(int argc, char **argv)
 	printf("Successfully started! Please run `sudo cat /sys/kernel/tracing/trace_pipe` "
 	       "to see output of the BPF programs.\n");
 
-	pause();
-	
-	while (!stop) {
-		fprintf(stderr, ".");
-		sleep(1);
+	/* Set up ring buffer polling */
+	rb = ring_buffer__new(bpf_map__fd(skel->maps.rb), handle_event, NULL, NULL);
+	if (!rb) {
+		err = -1;
+		fprintf(stderr, "Failed to create ring buffer\n");
+		goto cleanup;
 	}
 
+	while (!stop) {
+		err = ring_buffer__poll(rb, 100 /* timeout, ms */);
+		if (err == -EINTR) {
+			err = 0;
+			break;
+		}
+		if (err < 0) {
+			printf("Error polling ring buffer: %d\n", err);
+			break;
+		}
+	}
+ 
 cleanup:
+	ring_buffer__free(rb);
+	ringbuf_output_bpf__destroy(skel);
 	fentry_bpf__destroy(skel);
 	return -err;
 }
