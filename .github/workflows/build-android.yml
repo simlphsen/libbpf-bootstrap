@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [armeabi-v7a, arm64-v8a, x86_64]
+        arch: [arm64-v8a, x86_64]
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
