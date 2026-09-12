@@ -190,8 +190,12 @@ SEC("kprobe/disksize_show")
 int BPF_KPROBE(disksize_show)
 {
 	if (!zg) return 0;
-	for (int i = 0; i < 16; i++)
-		bpf_printk("xxx zram_bitmap: ptr = %lx\n", BPF_CORE_READ(zg, bitmap[i]));
+	unsigned long *bitmap = BPF_CORE_READ(zg, bitmap);
+	unsigned long tmp[16];
+	bpf_probe_read_kernel(tmp, sizeof(tmp), bitmap);
+	for (int i = 0; i < 16; i++) {
+		bpf_printk("xxx zram_bitmap: ptr = %lx\n", tmp[i]);
+	}
 	return 0;
 }
 
